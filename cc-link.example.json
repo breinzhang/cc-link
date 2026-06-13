@@ -1,0 +1,102 @@
+{
+  "sourceRoot": "/path/to/src",
+  "targetRoot": ".claude",
+  "statusline": {
+    "lines": 2,
+    "cost": {
+      "enabled": true,
+      "currency": "USD",
+      "prices": [
+        {
+          "provider": "Kimi/Moonshot",
+          "models": [
+            {
+              "match": "kimi-k2.7-code*",
+              "input": 0.95,
+              "output": 4.0,
+              "cacheWrite": 0.95,
+              "cacheRead": 0.19
+            },
+            {
+              "match": "kimi-k2.6*",
+              "input": 0.95,
+              "output": 4.0,
+              "cacheWrite": 0.95,
+              "cacheRead": 0.16
+            }
+          ]
+        },
+        {
+          "provider": "GLM/Z.AI",
+          "models": [
+            {
+              "match": "glm-5.2*",
+              "input": 1.4,
+              "output": 4.4,
+              "cacheWrite": 1.4,
+              "cacheRead": 0.26
+            },
+            {
+              "match": "glm-5.1*",
+              "input": 1.4,
+              "output": 4.4,
+              "cacheWrite": 1.4,
+              "cacheRead": 0.26
+            },
+            {
+              "match": "glm-4.5-air*",
+              "input": 0.2,
+              "output": 1.1,
+              "cacheWrite": 0.2,
+              "cacheRead": 0.03
+            }
+          ]
+        },
+        {
+          "provider": "DeepSeek",
+          "models": [
+            {
+              "match": "deepseek-v4-flash*",
+              "input": 0.14,
+              "output": 0.28,
+              "cacheWrite": 0.14,
+              "cacheRead": 0.0028
+            },
+            {
+              "match": "deepseek-v4-pro*",
+              "input": 0.435,
+              "output": 0.87,
+              "cacheWrite": 0.435,
+              "cacheRead": 0.003625
+            }
+          ]
+        },
+        {
+          "provider": "MiniMax",
+          "models": [
+            {
+              "match": "minimax-m3*",
+              "input": 0.30,
+              "output": 1.20,
+              "cacheWrite": 0.30,
+              "cacheRead": 0.06
+            },
+            {
+              "match": "minimax-m2.7*",
+              "input": 0.30,
+              "output": 1.20,
+              "cacheWrite": 0.375,
+              "cacheRead": 0.06
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "links": {
+    "skills": ["custom", "mattpocock", "superpowers"],
+    "agents": ["reviewer.md"],
+    "commands": ["git/commit.md"],
+    "rules": ["memory.md"]
+  }
+}
