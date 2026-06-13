@@ -31,7 +31,7 @@ func TestRenderStatuslineShowsContextBranchAndCountdown(t *testing.T) {
 		Now:            time.Date(2026, 6, 13, 15, 4, 5, 0, time.Local),
 	})
 
-	for _, want := range []string{"❬Opus❭", "📁 cc-link-tool", "🌿 main", "15:04:05", "56k/200k", "72% left", "⏳ 4:38"} {
+	for _, want := range []string{"❬Opus❭", "📁 cc-link-tool", "🌿 main", "15:04:05", "ctx ", "72% free", "56k/200k", "⏳ 4:38"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("rendered statusline missing %q:\n%s", want, out)
 		}
@@ -60,8 +60,8 @@ func TestRenderStatuslineHandlesNullContextAndExpiredCache(t *testing.T) {
 	if strings.Contains(out, "缓存") || strings.Contains(out, "⏳") {
 		t.Fatalf("cache should be hidden before current usage exists:\n%s", out)
 	}
-	if !strings.Contains(out, ansiGreen) {
-		t.Fatalf("initial statusline should render green:\n%q", out)
+	if !strings.Contains(out, "ctx ") || !strings.Contains(out, "--% free") {
+		t.Fatalf("initial statusline should render an unknown free context:\n%q", out)
 	}
 }
 
@@ -72,27 +72,33 @@ func TestRenderCachePrefixesExpiredCacheWithWarning(t *testing.T) {
 	}
 }
 
-func TestRenderContextUsesSolidProgressAndDottedBackground(t *testing.T) {
-	out := renderContext(&statuslineContext{
-		TotalInputTokens:    100000,
-		ContextWindowSize:   200000,
-		RemainingPercentage: 50,
-		CurrentUsage:        &statuslineUsage{InputTokens: 100000},
-	})
-	if !strings.Contains(out, "██████████⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿") {
-		t.Fatalf("context bar should use solid progress and filled dotted background:\n%s", out)
+func TestRenderContextUsesBatteryFreeBar(t *testing.T) {
+	tests := []struct {
+		name      string
+		total     int64
+		remaining float64
+		color     string
+		bar       string
+		want      string
+	}{
+		{name: "mostly free", total: 32000, remaining: 97, color: "\033[38;5;114m", bar: "▰▰▰▰▰▰▰▰▰▰▰▰", want: "ctx 97% free"},
+		{name: "comfortable", total: 280000, remaining: 72, color: "\033[38;5;114m", bar: "▰▰▰▰▰▰▰▰▰▱▱▱", want: "ctx 72% free"},
+		{name: "low", total: 720000, remaining: 28, color: "\033[38;5;208m", bar: "▰▰▰▱▱▱▱▱▱▱▱▱", want: "ctx 28% free"},
+		{name: "critical", total: 910000, remaining: 9, color: "\033[38;5;203m", bar: "▰▱▱▱▱▱▱▱▱▱▱▱", want: "ctx 09% free"},
 	}
-}
-
-func TestRenderContextShowsSmallProgress(t *testing.T) {
-	out := renderContext(&statuslineContext{
-		TotalInputTokens:    29000,
-		ContextWindowSize:   1000000,
-		RemainingPercentage: 97,
-		CurrentUsage:        &statuslineUsage{InputTokens: 29000},
-	})
-	if !strings.Contains(out, "█⣿⣿⣿") {
-		t.Fatalf("small non-zero progress should still show a solid segment:\n%s", out)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := renderContext(&statuslineContext{
+				TotalInputTokens:    tt.total,
+				ContextWindowSize:   1000000,
+				RemainingPercentage: tt.remaining,
+				CurrentUsage:        &statuslineUsage{InputTokens: tt.total},
+			})
+			want := "ctx " + tt.color + tt.want[len("ctx "):] + " " + tt.bar + ansiReset + " " + formatTokens(tt.total) + "/1m"
+			if out != want {
+				t.Fatalf("context = %q, want %q", out, want)
+			}
+		})
 	}
 }
 
@@ -128,7 +134,7 @@ func TestStableContextWindowReusesLastUsageWhenCurrentUsageDisappearsInSameParen
 		t.Fatalf("stable context = %#v, want previous non-empty usage", got)
 	}
 	out := renderStatusline(statuslinePayload{ContextWindow: got}, statuslineRenderOptions{})
-	if strings.Contains(out, "100% left") || !strings.Contains(out, "72% left") {
+	if strings.Contains(out, "100% free") || !strings.Contains(out, "72% free") {
 		t.Fatalf("rendered stable context should keep previous percentage:\n%s", out)
 	}
 }
@@ -160,7 +166,7 @@ func TestStableContextWindowReusesLastUsageAcrossParentProcessForResume(t *testi
 		t.Fatalf("resume in a new parent process should reuse old context: %#v", got)
 	}
 	out := renderStatusline(statuslinePayload{ContextWindow: got}, statuslineRenderOptions{CacheRemaining: 5 * time.Minute})
-	if !strings.Contains(out, "72% left") || strings.Contains(out, "⏳") {
+	if !strings.Contains(out, "72% free") || strings.Contains(out, "⏳") {
 		t.Fatalf("resumed startup should keep context but hide cache countdown:\n%s", out)
 	}
 	if contextBelongsToCurrentParent(payload, tmp, 222) {
@@ -203,17 +209,23 @@ func TestRenderStatuslineLinesOption(t *testing.T) {
 }
 
 func TestContextColorThresholdsUseRemainingPercentage(t *testing.T) {
-	if contextColor(70) != ansiGreen {
-		t.Fatal("70% left should be green")
+	if contextColor(70) != "\033[38;5;114m" {
+		t.Fatal("70% free should use muted cyan-green")
 	}
-	if contextColor(69.9) != ansiYellow {
-		t.Fatal("below 70% left should be yellow/orange")
+	if contextColor(69.9) != "\033[38;5;215m" {
+		t.Fatal("below 70% free should use amber")
 	}
-	if contextColor(30) != ansiYellow {
-		t.Fatal("30% left should be yellow/orange")
+	if contextColor(40) != "\033[38;5;215m" {
+		t.Fatal("40% free should use amber")
 	}
-	if contextColor(29.9) != ansiRed {
-		t.Fatal("below 30% left should be red")
+	if contextColor(39.9) != "\033[38;5;208m" {
+		t.Fatal("below 40% free should use orange")
+	}
+	if contextColor(15) != "\033[38;5;208m" {
+		t.Fatal("15% free should use orange")
+	}
+	if contextColor(14.9) != "\033[38;5;203m" {
+		t.Fatal("below 15% free should use soft red")
 	}
 }
 

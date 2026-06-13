@@ -19,8 +19,12 @@ const (
 	ansiGreen       = "\033[32m"
 	ansiYellow      = "\033[33m"
 	ansiRed         = "\033[31m"
+	ansiContextHigh = "\033[38;5;114m"
+	ansiContextMid  = "\033[38;5;215m"
+	ansiContextLow  = "\033[38;5;208m"
+	ansiContextRisk = "\033[38;5;203m"
 	ansiReset       = "\033[0m"
-	contextBarWidth = 20
+	contextBarWidth = 12
 )
 
 type statuslinePayload struct {
@@ -228,40 +232,29 @@ func buildFirstLine(model, dir, branch, clock string) string {
 
 func renderContext(ctx *statuslineContext) string {
 	if ctx == nil || ctx.ContextWindowSize <= 0 {
-		return ansiGreen + dottedProgressBackground(contextBarWidth) + ansiReset + " --/-- " + ansiGreen + "--% left" + ansiReset
+		color := contextColor(100)
+		return fmt.Sprintf("ctx %s--%% free %s%s --/--", color, batteryFreeBar(0), ansiReset)
 	}
 	if ctx.CurrentUsage == nil {
-		return fmt.Sprintf("%s%s%s --/%s %s100%% left%s",
-			ansiGreen,
-			dottedProgressBackground(contextBarWidth),
+		color := contextColor(100)
+		return fmt.Sprintf("ctx %s100%% free %s%s --/%s",
+			color,
+			batteryFreeBar(100),
 			ansiReset,
 			formatTokens(ctx.ContextWindowSize),
-			ansiGreen,
-			ansiReset,
 		)
 	}
-	remaining := int(math.Round(ctx.RemainingPercentage))
-	usedPct := ctx.UsedPercentage
-	if usedPct == 0 {
-		usedPct = 100 - ctx.RemainingPercentage
+	remainingPct := ctx.RemainingPercentage
+	if remainingPct == 0 && ctx.UsedPercentage > 0 {
+		remainingPct = 100 - ctx.UsedPercentage
 	}
-	filled := int(math.Round(usedPct * contextBarWidth / 100))
-	if usedPct > 0 && filled == 0 {
-		filled = 1
-	}
-	if filled < 0 {
-		filled = 0
-	}
-	if filled > contextBarWidth {
-		filled = contextBarWidth
-	}
-	bar := strings.Repeat("█", filled) + dottedProgressBackground(contextBarWidth-filled)
-	color := contextColor(ctx.RemainingPercentage)
-	return fmt.Sprintf("%s%s%s %s/%s %s%d%% left%s",
-		color, bar, ansiReset,
+	remainingPct = clampPercentage(remainingPct)
+	remaining := int(math.Round(remainingPct))
+	color := contextColor(remainingPct)
+	return fmt.Sprintf("ctx %s%02d%% free %s%s %s/%s",
+		color, remaining, batteryFreeBar(remainingPct), ansiReset,
 		formatTokens(ctx.TotalInputTokens),
 		formatTokens(ctx.ContextWindowSize),
-		color, remaining, ansiReset,
 	)
 }
 
@@ -308,13 +301,6 @@ func joinNonEmpty(sep string, values ...string) string {
 	return strings.Join(out, sep)
 }
 
-func dottedProgressBackground(width int) string {
-	if width <= 0 {
-		return ""
-	}
-	return strings.Repeat("⣿", width)
-}
-
 func formatTokens(n int64) string {
 	switch {
 	case n <= 0:
@@ -340,12 +326,40 @@ func formatClock(d time.Duration) string {
 
 func contextColor(remaining float64) string {
 	if remaining >= 70 {
-		return ansiGreen
+		return ansiContextHigh
 	}
-	if remaining >= 30 {
-		return ansiYellow
+	if remaining >= 40 {
+		return ansiContextMid
 	}
-	return ansiRed
+	if remaining >= 15 {
+		return ansiContextLow
+	}
+	return ansiContextRisk
+}
+
+func batteryFreeBar(remaining float64) string {
+	remaining = clampPercentage(remaining)
+	filled := int(math.Round(remaining * contextBarWidth / 100))
+	if remaining > 0 && filled == 0 {
+		filled = 1
+	}
+	if filled < 0 {
+		filled = 0
+	}
+	if filled > contextBarWidth {
+		filled = contextBarWidth
+	}
+	return strings.Repeat("▰", filled) + strings.Repeat("▱", contextBarWidth-filled)
+}
+
+func clampPercentage(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return v
 }
 
 func cacheColor(remaining, ttl time.Duration) string {

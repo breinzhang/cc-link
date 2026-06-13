@@ -342,10 +342,10 @@ The statusline uses English labels:
 
 ```text
 ❬Sonnet❭ 📁 project 🌿 main 🕒 15:04:05
-██████⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿ 56k/200k 72% left  ⏳ 4:38  Session $0.012 Today $0.31 Week $1.24 Month $5.80
+ctx 72% free ▰▰▰▰▰▰▰▰▰▱▱▱ 56k/200k  ⏳ 4:38  Session $0.012 Today $0.31 Week $1.24 Month $5.80
 ```
 
-Context color is based on percentage left: `70-100` green, `30-70` yellow/orange, below `30` red. The used part of the 20-cell context bar is solid, and the unused part uses a filled dotted background with no horizontal gaps. Before Claude Code reports `current_usage`, the statusline renders a green empty bar and hides the cache countdown. When `claude --resume` starts a resumed session in a new Claude process, the statusline may reuse the previous context percentage, but the cache countdown stays hidden until a new assistant reply is completed in the current process. The countdown starts from the last completed assistant `end_turn` transcript event and ignores trailing non-message records such as result summaries. Expired cache is prefixed with a yellow `⚠️`.
+Context color is based on percentage free: `70-100` uses muted cyan-green (`38;5;114`), `40-69` amber (`38;5;215`), `15-39` orange (`38;5;208`), and below `15` soft red (`38;5;203`). The 12-cell context bar uses a battery-style free view: filled cells are remaining context, empty cells are used context. Before Claude Code reports `current_usage`, the statusline shows `100% free` when the context window size is known, or `--% free` when it is not, and hides the cache countdown. When `claude --resume` starts a resumed session in a new Claude process, the statusline may reuse the previous context percentage, but the cache countdown stays hidden until a new assistant reply is completed in the current process. The countdown starts from the last completed assistant `end_turn` transcript event and ignores trailing non-message records such as result summaries. Expired cache is prefixed with a yellow `⚠️`.
 
 When the latest semantic transcript event is `/exit`, the command emits no statusline output. This prevents Claude Code's final `refreshInterval` tick from repainting the statusline after the exit message.
 
