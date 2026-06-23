@@ -1099,7 +1099,7 @@ func linkItems(items []LinkItem, opts Options) (map[string]struct{}, error) {
 
 	for _, it := range items {
 		targetSet[filepath.Clean(it.Target)] = struct{}{}
-		linkType, err := ensureLink(it, opts)
+		linkType, err := ensureLink(it, opts, lock.entryForTarget(it.Target))
 		if err != nil {
 			return nil, err
 		}
@@ -1121,7 +1121,7 @@ func targetRootFromItems(items []LinkItem) string {
 	return filepath.Dir(filepath.Dir(items[0].Target))
 }
 
-func ensureLink(it LinkItem, opts Options) (string, error) {
+func ensureLink(it LinkItem, opts Options, existing *LockEntry) (string, error) {
 	if _, err := os.Stat(it.Source); err != nil {
 		return "", fmt.Errorf("source missing: %s", it.Source)
 	}
@@ -1149,6 +1149,10 @@ func ensureLink(it LinkItem, opts Options) (string, error) {
 				return "", err
 			}
 		} else {
+			if managedNonSymlinkLink(existing, it) {
+				fmt.Println("SKIP", it.Target, "already linked")
+				return existing.LinkType, nil
+			}
 			return "", fmt.Errorf("target exists and is not a symlink: %s", it.Target)
 		}
 	} else if !os.IsNotExist(err) {
@@ -1168,6 +1172,20 @@ func ensureLink(it LinkItem, opts Options) (string, error) {
 	}
 	fmt.Println(action)
 	return linkType, nil
+}
+
+func managedNonSymlinkLink(existing *LockEntry, it LinkItem) bool {
+	if existing == nil {
+		return false
+	}
+	if existing.LinkType != "junction" && existing.LinkType != "hardlink" {
+		return false
+	}
+	return sameCleanPath(existing.Target, it.Target) && sameCleanPath(existing.Source, it.Source)
+}
+
+func sameCleanPath(a, b string) bool {
+	return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
 }
 
 func samePathOrSameEval(linkDest, source, targetDir string) bool {
@@ -1349,6 +1367,16 @@ func writeLock(targetRoot string, lock Lock) error {
 
 func lockPath(targetRoot string) string {
 	return filepath.Join(targetRoot, lockFileName)
+}
+
+func (l *Lock) entryForTarget(target string) *LockEntry {
+	target = filepath.Clean(target)
+	for i := range l.Entries {
+		if filepath.Clean(l.Entries[i].Target) == target {
+			return &l.Entries[i]
+		}
+	}
+	return nil
 }
 
 func (l *Lock) upsert(e LockEntry) {

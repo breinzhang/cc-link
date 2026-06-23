@@ -401,15 +401,6 @@ func updateCacheCountdown(payload statuslinePayload, stateDir string, ttl time.D
 	} else if !os.IsNotExist(err) {
 		return 0, false, err
 	}
-	if state.ParentPID != 0 && state.ParentPID != parentPID {
-		state.TranscriptMarker = marker
-		state.LastReplyUnix = 0
-		state.ParentPID = parentPID
-		if err := writeStatuslineCache(statePath, state); err != nil {
-			return 0, false, err
-		}
-		return 0, false, nil
-	}
 	if state.TranscriptMarker != marker || state.LastReplyUnix == 0 {
 		state.TranscriptMarker = marker
 		state.ParentPID = parentPID

@@ -478,6 +478,31 @@ func TestUpdateCacheCountdownStartsAfterCompletedAssistantReply(t *testing.T) {
 	}
 }
 
+func TestUpdateCacheCountdownSurvivesParentProcessChange(t *testing.T) {
+	tmp := t.TempDir()
+	transcript := filepath.Join(tmp, "transcript.jsonl")
+	writeTranscript(t, transcript, `{"type":"assistant","message":{"role":"assistant","content":"done","stop_reason":"end_turn"}}`)
+	payload := statuslinePayload{SessionID: "session-1", TranscriptPath: transcript}
+	ttl := 5 * time.Minute
+	now := time.Unix(1000, 0)
+
+	remaining, visible, err := updateCacheCountdown(payload, tmp, ttl, now, 111)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !visible || remaining != ttl {
+		t.Fatalf("completed assistant reply should start cache countdown: visible=%v remaining=%s", visible, remaining)
+	}
+
+	remaining, visible, err = updateCacheCountdown(payload, tmp, ttl, now.Add(2*time.Second), 222)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !visible || remaining != ttl-2*time.Second {
+		t.Fatalf("parent process change should keep ticking countdown: visible=%v remaining=%s, want %s", visible, remaining, ttl-2*time.Second)
+	}
+}
+
 func TestUpdateCacheCountdownStartsWhenCompletedAssistantHasTrailingNonMessageLine(t *testing.T) {
 	tmp := t.TempDir()
 	transcript := filepath.Join(tmp, "transcript.jsonl")
@@ -515,31 +540,6 @@ func TestUpdateCacheCountdownHidesAfterToolUseAssistant(t *testing.T) {
 	}
 	if visible || remaining != 0 {
 		t.Fatalf("tool_use assistant should not start cache countdown: visible=%v remaining=%s", visible, remaining)
-	}
-}
-
-func TestUpdateCacheCountdownBaselinesResumeParentWithoutVisibleTimer(t *testing.T) {
-	tmp := t.TempDir()
-	transcript := filepath.Join(tmp, "transcript.jsonl")
-	writeTranscript(t, transcript, `{"type":"assistant","message":{"role":"assistant","content":"old","stop_reason":"end_turn"}}`)
-	payload := statuslinePayload{SessionID: "session-1", TranscriptPath: transcript}
-	ttl := 5 * time.Minute
-	now := time.Unix(1000, 0)
-
-	remaining, visible, err := updateCacheCountdown(payload, tmp, ttl, now, 111)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !visible || remaining != ttl {
-		t.Fatalf("first completed reply in parent should start timer: visible=%v remaining=%s", visible, remaining)
-	}
-
-	remaining, visible, err = updateCacheCountdown(payload, tmp, ttl, now.Add(time.Minute), 222)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if visible || remaining != 0 {
-		t.Fatalf("resume parent should baseline old transcript without visible timer: visible=%v remaining=%s", visible, remaining)
 	}
 }
 

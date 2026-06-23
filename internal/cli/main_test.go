@@ -539,6 +539,44 @@ func TestLinkItemsRecordsLinkType(t *testing.T) {
 	}
 }
 
+func TestLinkItemsSkipsManagedWindowsDirectoryLinkFromLock(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "src", "skills", "custom", "one")
+	targetRoot := filepath.Join(tmp, "project", ".claude")
+	target := filepath.Join(targetRoot, "skills", "one")
+	mkdirTestDir(t, source)
+	mkdirTestDir(t, target)
+	if err := writeLock(targetRoot, Lock{Entries: []LockEntry{{
+		Kind:     "skills",
+		Name:     "one",
+		Group:    "custom",
+		Source:   source,
+		Target:   target,
+		LinkType: "junction",
+	}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := linkItems([]LinkItem{{
+		Kind:   "skills",
+		Name:   "one",
+		Group:  "custom",
+		Source: source,
+		Target: target,
+	}}, Options{TargetRoot: targetRoot})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lock := readTestLock(t, targetRoot)
+	if len(lock.Entries) != 1 {
+		t.Fatalf("lock entries = %d, want 1: %#v", len(lock.Entries), lock.Entries)
+	}
+	if lock.Entries[0].LinkType != "junction" {
+		t.Fatalf("linkType = %q, want junction", lock.Entries[0].LinkType)
+	}
+}
+
 func TestUnlinkRemovesHardlinkRecordedInLock(t *testing.T) {
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "src", "rules", "memory.md")
