@@ -178,7 +178,7 @@ Examples:
 
 Notes:
   - The target root defaults to .claude under the current working directory.
-  - Skills are flattened: skills/mattpocock/<skill> -> .claude/skills/<skill>.
+  - Skills are flattened: skills/mattpocock/<skill> or skills/team/frontend/<skill> -> .claude/skills/<skill>.
   - Other kinds are mapped directly: rules/x.md -> .claude/rules/x.md.
   - Existing real files/directories are never overwritten. --force only replaces existing symlinks.
 `, appName)
@@ -856,18 +856,41 @@ func resolveSkills(sourceRoot, targetRoot, arg string) ([]LinkItem, error) {
 		return []LinkItem{skillItem(targetRoot, m, filepath.Base(filepath.Dir(m)))}, nil
 	}
 
-	if len(parts) == 2 {
-		direct := filepath.Join(base, parts[0], parts[1])
+	if len(parts) >= 2 {
+		direct := filepath.Join(append([]string{base}, parts...)...)
 		if _, err := os.Stat(direct); err != nil {
 			if os.IsNotExist(err) {
 				return nil, fmt.Errorf("skill not found: %s", arg)
 			}
 			return nil, err
 		}
-		return []LinkItem{skillItem(targetRoot, direct, parts[0])}, nil
+		if isGroup, err := isSkillGroupDir(direct); err != nil {
+			return nil, err
+		} else if isGroup {
+			return resolveSkillCategory(sourceRoot, targetRoot, strings.Join(parts, "/"), direct)
+		}
+		return []LinkItem{skillItem(targetRoot, direct, strings.Join(parts[:len(parts)-1], "/"))}, nil
 	}
 
 	return nil, fmt.Errorf("skill argument must be category or category/name: %s", arg)
+}
+
+func isSkillGroupDir(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
+	hasChildDir := false
+	for _, e := range entries {
+		if shouldSkipName(e.Name()) {
+			continue
+		}
+		if !e.IsDir() {
+			return false, nil
+		}
+		hasChildDir = true
+	}
+	return hasChildDir, nil
 }
 
 func resolveSkillCategory(sourceRoot, targetRoot, group, dir string) ([]LinkItem, error) {

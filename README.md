@@ -2,7 +2,7 @@
 
 `cc-link` is a small Go CLI that links a shared Claude Code asset library into any project `.claude/` directory.
 
-It supports `skills`, `agents`, `commands`, `rules`, and any other top-level asset kind in your source library. Skills are special-cased because they use a two-level layout; other kinds are mapped as-is.
+It supports `skills`, `agents`, `commands`, `rules`, and any other top-level asset kind in your source library. Skills are special-cased because category paths are flattened into `.claude/skills`; other kinds are mapped as-is.
 
 ## Install
 
@@ -129,6 +129,7 @@ From a project root:
 ```bash
 cc-link link skills custom
 cc-link link skills custom/my-skill
+cc-link link skills custom/frontend
 cc-link link agents reviewer.md
 cc-link link commands git/commit.md
 cc-link link rules memory.md
@@ -140,7 +141,8 @@ cc-link link all
 Skills behavior:
 
 - `skills <category>` links every skill under that category into `.claude/skills/<skill>`.
-- `skills <category>/<skill>` links one skill.
+- `skills <category>/<path>` links one skill when the path is a skill file or directory.
+- `skills <category>/<sub-category>` links every direct child skill directory when the path is a subcategory directory.
 - `skills <skill>` searches all categories; if multiple categories contain the same skill name, use `category/skill`.
 
 Other kinds map directly:

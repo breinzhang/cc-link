@@ -98,6 +98,37 @@ func TestResolveSkillsCategoryAndSingleSkillByPathSegments(t *testing.T) {
 	}
 }
 
+func TestResolveSkillsSubcategoryExpandsChildSkills(t *testing.T) {
+	tmp := t.TempDir()
+	sourceRoot := filepath.Join(tmp, "src")
+	targetRoot := filepath.Join(tmp, "project", ".claude")
+	writeTestFile(t, filepath.Join(sourceRoot, "skills", "category", "sub-category", "skill-A", "README.md"))
+	writeTestFile(t, filepath.Join(sourceRoot, "skills", "category", "sub-category", "skill-B", "README.md"))
+
+	items, err := resolveSkills(sourceRoot, targetRoot, "category/sub-category")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("subcategory resolved %d items, want 2: %#v", len(items), items)
+	}
+
+	got := itemSet(items)
+	wantA := filepath.Join(targetRoot, "skills", "skill-A")
+	wantB := filepath.Join(targetRoot, "skills", "skill-B")
+	if got[wantA] != filepath.Join(sourceRoot, "skills", "category", "sub-category", "skill-A") {
+		t.Fatalf("skill-A item not resolved correctly: %#v", got)
+	}
+	if got[wantB] != filepath.Join(sourceRoot, "skills", "category", "sub-category", "skill-B") {
+		t.Fatalf("skill-B item not resolved correctly: %#v", got)
+	}
+	for _, it := range items {
+		if it.Group != "category/sub-category" {
+			t.Fatalf("group = %q, want category/sub-category in %#v", it.Group, items)
+		}
+	}
+}
+
 func TestCmdInitWritesGlobalConfig(t *testing.T) {
 	tmp := t.TempDir()
 	home := filepath.Join(tmp, "home")
